@@ -1,5 +1,5 @@
-from email import message
-from flask import Flask
+import os
+from flask import Flask, jsonify
 from flask_restful import Api, Resource, reqparse, abort, fields, marshal_with 
 from flask_sqlalchemy import SQLAlchemy
 
@@ -17,6 +17,11 @@ class VideoModels(db.Model):
     
     def __repr__(self):
         return f"Video( name = {name}, views = {views}, likes = {likes})"
+
+
+# the block of code below ensures that the database is only created once.
+if os.path.exists('database.db') != True:
+    db.create_all()
 
 # the resource fields is used to serialize the data into a json object
 # this is done by importing fields and marshal with from flask_restful
@@ -42,7 +47,6 @@ video_update_args = reqparse.RequestParser()
 video_update_args.add_argument("name", type=str)
 video_update_args.add_argument("views", type=int)
 video_update_args.add_argument("likes", type=int)
-
         
 class Video(Resource):
     # the marshal_with decorator ensures that the returned value is serialized
@@ -89,9 +93,13 @@ class Video(Resource):
         return video, 200
     
     def delete(self, video_id):
-        abort_if_video_id_does_not_exist(video_id)
-        del videos[video_id]
-        return {"message": "deleted"}, 204
+        video = VideoModels.query.get(video_id)
+        if video:
+            db.session.delete(video)
+            db.session.commit()
+        else:
+            abort(404, message="this video does not exist")
+        return jsonify(message='video has been deleted')
         
 api.add_resource(Video, '/video/<int:video_id>')
 
